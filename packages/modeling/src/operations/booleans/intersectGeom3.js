@@ -4,6 +4,8 @@ const retessellate = require('../modifiers/retessellate')
 
 const intersectSub = require('./intersectGeom3Sub')
 
+const walnut = require('./walnut')
+
 /*
  * Return a new 3D geometry representing space in both the first geometry and
  * in the subsequent geometries. None of the given geometries are modified.
@@ -12,6 +14,11 @@ const intersectSub = require('./intersectGeom3Sub')
  */
 const intersect = (...geometries) => {
   geometries = flatten(geometries)
+  console.log('walnut is', walnut.walnut)
+  if (walnut.walnut !== null) {
+    fromWalnut = walnut.intersect(geometries[0], geometries[1])
+    return fromWalnut
+  }
 
   let newgeometry = geometries.shift()
   geometries.forEach((geometry) => {
