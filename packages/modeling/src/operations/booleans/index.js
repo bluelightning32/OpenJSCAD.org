@@ -10,5 +10,6 @@ module.exports = {
   intersect: require('./intersect'),
   scission: require('./scission'),
   subtract: require('./subtract'),
-  union: require('./union')
+  union: require('./union'),
+  walnut: require('./walnut')
 }

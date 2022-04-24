@@ -72,3 +72,4 @@ const sortExamples = (examples) => {
 }
 
 copyAndProcessExamples(examplesSrc)
+copydir.sync('node_modules/@jscad/modeling/node_modules/@bluelightning32/walnut/release/walnut.wasm', 'dist/walnut.wasm', { mode: false })

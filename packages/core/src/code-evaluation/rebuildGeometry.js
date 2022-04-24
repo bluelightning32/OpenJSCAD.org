@@ -56,15 +56,17 @@ const rebuildSolids = (data, callback) => {
     lookupCounts,
     serialize
   }
-  const solidsData = instanciateDesign(designData.rootModule, parameterValues, options)
-
-  // send back solids & any other metadata
-  callback(null, {
-    type: 'solids',
-    solids: solidsData.solids,
-    lookup: solidsData.lookup,
-    lookupCounts: solidsData.lookupCounts
-  })
+  Promise.resolve(
+    instanciateDesign(designData.rootModule, parameterValues, options))
+  .then( (solidsData) =>
+    // send back solids & any other metadata
+    callback(null, {
+      type: 'solids',
+      solids: solidsData.solids,
+      lookup: solidsData.lookup,
+      lookupCounts: solidsData.lookupCounts
+    })
+  )
 }
 
 module.exports = rebuildSolids

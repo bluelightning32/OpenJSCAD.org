@@ -16,11 +16,11 @@ const isResultGeometry = (results) => {
   return false
 }
 
-const instanciateDesign = (rootModule, parameterValues, options) => {
+const instanciateDesign = async (rootModule, parameterValues, options) => {
   const { serialize } = options
   // deal with the actual solids generation
   let solids
-  const rawResults = flatten(toArray(rootModule.main(parameterValues)))
+  const rawResults = flatten(toArray(await rootModule.main(parameterValues)))
 
   if (isResultGeometry(rawResults)) {
     solids = serialize ? serializeSolids(rawResults) : rawResults

@@ -61,5 +61,8 @@
     "nyc": "15.1.0",
     "uglifyify": "5.0.2"
   },
-  "gitHead": "a90b9bad95a417661c619dc733e62c587dc71a4a"
+  "gitHead": "a90b9bad95a417661c619dc733e62c587dc71a4a",
+  "dependencies": {
+    "@bluelightning32/walnut": "^1.0.3"
+  }
 }
