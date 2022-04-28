@@ -5,17 +5,14 @@ const walnutInit = require('@bluelightning32/walnut')
 
 const PRECISION = -10
 
-console.log('jscad walnut imported')
-
 function init(wasmPath, callback) {
   if (module.exports.walnut !== null) {
     console.log('walnut already initialized')
     callback()
     return
   }
-  console.log('walnut init starting')
+  console.log('walnut initializing')
   function findWasm(file, scriptDirectory) {
-    console.log('findWasm', wasmPath)
     return wasmPath
   }
 
@@ -46,7 +43,7 @@ function toWalnut(obj){
   obj.polygons.forEach(p=>vertexCount += p.length)
   let mesh = module.exports.walnut._AllocateMesh(vertexCount)
 
-  polyBuffer = w_AllocateFloatVertexArray(4096)
+  const polyBuffer = w_AllocateFloatVertexArray(4096)
   tmpBuffer = module.exports.walnut._AllocateTempVertexBuffer()
 
   obj.polygons.forEach(p=>{
@@ -73,6 +70,9 @@ function toWalnutTransformed(obj){
   obj.polygons.forEach(p=>vertexCount += p.length)
   let mesh = module.exports.walnut._AllocateMesh(vertexCount)
 
+  const polyBuffer = w_AllocateFloatVertexArray(4096)
+  tmpBuffer = module.exports.walnut._AllocateTempVertexBuffer()
+
   let v = [0,0,0]
   obj.polygons.forEach(p=>{
     if(p.vertices) p = p.vertices // jscad format
@@ -84,40 +84,66 @@ function toWalnutTransformed(obj){
     })
     module.exports.walnut._AddFloatPolygonToMesh(count/3, polyBuffer.vertexPointer, tmpBuffer, mesh, PRECISION)
   })
+
+  module.exports.walnut._FreeTempVertexBuffer(tmpBuffer)
+  polyBuffer.free()
+
   mesh.vertexCount = vertexCount	
   return mesh
 }
 
 function toGeom(mesh){
-  let triangleCount = module.exports.walnut._GetTriangleCountInMesh(mesh)
-  let vertexCount = triangleCount * 3
-  let vertexPointer = module.exports.walnut._AllocateFloatVertexArray(vertexCount)
-  module.exports.walnut._GetFloatTrianglesFromMesh(mesh, vertexPointer)
+  const combined = module.exports.walnut._GetDoublePolygonArrayFromMesh(mesh, 0)
 
-  let vertices = new Float32Array(vertexCount * 3)
-  vertices.set(module.exports.walnut.HEAPF32.subarray(vertexPointer/4, vertexPointer/4 + vertexCount*3))
-  let indices = new Uint16Array(vertexCount * 3)
-  for (let i = 0; i < vertexCount; ++i) {
-        indices[i] = i
-      }
-  module.exports.walnut._FreeFloatVertexArray(vertexPointer)
-  return {indices, vertices, type: 'mesh'}
+  const combinedFields = module.exports.walnut.HEAPU32.subarray(combined/4, combined/4 + 4)
+  const polygonCount = combinedFields[0]
+  const planes = module.exports.walnut.HEAPF64.subarray(combinedFields[1]/8, combinedFields[1]/8 + polygonCount*4)
+  const vertexCounts = module.exports.walnut.HEAPU32.subarray(combinedFields[2]/4, combinedFields[2]/4 + polygonCount)
+
+  let totalVertexCount = 0
+  for (let i = 0; i < polygonCount; ++i) {
+    totalVertexCount += vertexCounts[i]
+  }
+
+  const vertices = module.exports.walnut.HEAPF64.subarray(combinedFields[3]/8, combinedFields[3]/8 + 3*totalVertexCount)
+
+  const polygons = new Array(polygonCount)
+  let vertexIndex = 0
+  for (let i = 0; i < polygonCount; ++i) {
+    const outputVertices = new Array(vertexCounts[i])
+    for (let j = 0; j < vertexCounts[i]; ++j, vertexIndex += 3) {
+      outputVertices[j] = [
+        vertices[vertexIndex + 0],
+        vertices[vertexIndex + 1],
+        vertices[vertexIndex + 2],
+      ]
+    }
+    const plane = [
+      planes[i*4 + 0],
+      planes[i*4 + 1],
+      planes[i*4 + 2],
+      planes[i*4 + 3]
+    ]
+    polygons[i] = {
+      vertices: outputVertices,
+      plane: plane
+    }
+  }
+  identity = new Array(16)
+  mat4.identity(identity)
+  return {
+    polygons: polygons,
+    transforms: identity
+  }
 }
 
 function intersect(geom1, geom2){
-  console.log('intersect', geom1, geom2);
-  let time = Date.now()
   let wMesh1 = toWalnut(geom1)
-  console.log('Mesh1 transfered to walnut ', Date.now() - time);
-  time = Date.now()
   let wMesh2 = toWalnut(geom2)
-  console.log('Mesh2 transfered to walnut ', Date.now() - time);
 
   let wResult = module.exports.walnut._AllocateMesh(wMesh1.vertexCount)
 
   let filterSuccess = module.exports.walnut._IntersectMeshes(wMesh1, wMesh2, wResult)
-  console.log('intersect ', Date.now() - time);
-  time = Date.now()
 
   let result = toGeom(wResult)
 
@@ -125,11 +151,8 @@ function intersect(geom1, geom2){
   module.exports.walnut._FreeMesh(wMesh2)
   module.exports.walnut._FreeMesh(wResult)
 
-  result.color = geom1.color
   result.transforms = Array(16)
   mat4.identity(result.transforms)
-  console.log('filter result', filterSuccess, result)
-  console.log('toGeom ', Date.now() - time);
   return result
 }
 

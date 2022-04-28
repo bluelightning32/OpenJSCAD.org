@@ -14,7 +14,6 @@ const walnut = require('./walnut')
  */
 const intersect = (...geometries) => {
   geometries = flatten(geometries)
-  console.log('walnut is', walnut.walnut)
   if (walnut.walnut !== null) {
     fromWalnut = walnut.intersect(geometries[0], geometries[1])
     return fromWalnut
