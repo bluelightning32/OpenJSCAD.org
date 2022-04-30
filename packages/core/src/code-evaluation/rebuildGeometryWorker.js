@@ -10,16 +10,13 @@ const walnutInit = walnut.init
  * @param {Object} options the settings to use when rebuilding the solid
  */
 const rebuildGeometryWorker = (self) => {
-  console.log('Going to init')
   const rebuildGeometry = require('./rebuildGeometry')
   self.onmessage = function (event) {
-    console.log('onmessage', walnut.walnut)
     if (event.data instanceof Object) {
       const { data } = event
       if (data.cmd === 'generate') {
         if (walnut.walnut === null) {
           walnutInit(self.location.origin + '/dist/walnut.wasm', () => {
-            console.log('walnut initialized callback', walnut.walnut != null)
             rebuildGeometry(data, (err, message) => self.postMessage(message))
           })
         } else {

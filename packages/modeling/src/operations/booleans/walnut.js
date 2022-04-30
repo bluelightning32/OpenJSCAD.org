@@ -11,7 +11,6 @@ function init(wasmPath, callback) {
     callback()
     return
   }
-  console.log('walnut initializing')
   function findWasm(file, scriptDirectory) {
     return wasmPath
   }
@@ -22,73 +21,9 @@ function init(wasmPath, callback) {
 
   walnutInit(wasmModule).then(function (Module) {
     module.exports.walnut = Module
-    console.log('walnut initialized', Module != null)
+    console.log('walnut initialized, success=', Module != null)
     callback()
   })
-}
-
-function w_AllocateFloatVertexArray(vertexCount){
-  let vertexPointer = module.exports.walnut._AllocateFloatVertexArray(/*max_vertices=*/vertexCount)
-  let vertices = module.exports.walnut.HEAPF32.subarray(vertexPointer/4, vertexPointer/4 + vertexCount*3)
-  vertices.vertexPointer = vertexPointer
-  vertices.vertexCount = vertexCount
-  vertices.free = ()=> module.exports.walnut._FreeFloatVertexArray(vertexPointer)
-  return vertices
-}
-
-function toWalnut(obj){
-  if(obj.transforms && !mat4.isIdentity(obj.transforms)) return toWalnutTransformed(obj)
-  let vertexCount = 0
-  obj.polygons.forEach(p=>vertexCount += p.length)
-  let mesh = module.exports.walnut._AllocateMesh(vertexCount)
-
-  const polyBuffer = w_AllocateFloatVertexArray(4096)
-  tmpBuffer = module.exports.walnut._AllocateTempVertexBuffer()
-
-  obj.polygons.forEach(p=>{
-    if(p.vertices) p = p.vertices // jscad format
-    let count = 0
-    p.forEach(v=>{
-      polyBuffer.set(v, count)// count is also offset
-      count += 3
-    })
-    module.exports.walnut._AddFloatPolygonToMesh(count/3, polyBuffer.vertexPointer, tmpBuffer, mesh, PRECISION)
-  })
-
-  module.exports.walnut._FreeTempVertexBuffer(tmpBuffer)
-  polyBuffer.free()
-
-  mesh.vertexCount = vertexCount
-  return mesh
-}
-
-// apply transform during conversion to walnut internal model
-function toWalnutTransformed(obj){
-  let { transforms } = obj
-  let vertexCount = 0
-  obj.polygons.forEach(p=>vertexCount += p.length)
-  let mesh = module.exports.walnut._AllocateMesh(vertexCount)
-
-  const polyBuffer = w_AllocateFloatVertexArray(4096)
-  tmpBuffer = module.exports.walnut._AllocateTempVertexBuffer()
-
-  let v = [0,0,0]
-  obj.polygons.forEach(p=>{
-    if(p.vertices) p = p.vertices // jscad format
-    let count = 0
-    p.forEach(vIn=>{
-      vec3.transform(v,vIn,transforms)
-      polyBuffer.set(v, count)// count is also offset
-      count += 3
-    })
-    module.exports.walnut._AddFloatPolygonToMesh(count/3, polyBuffer.vertexPointer, tmpBuffer, mesh, PRECISION)
-  })
-
-  module.exports.walnut._FreeTempVertexBuffer(tmpBuffer)
-  polyBuffer.free()
-
-  mesh.vertexCount = vertexCount
-  return mesh
 }
 
 const doublePolygonArrayToGeom = (mesh) => {
