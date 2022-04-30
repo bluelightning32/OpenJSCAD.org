@@ -4,6 +4,8 @@ const retessellate = require('../modifiers/retessellate')
 
 const subtractSub = require('./subtractGeom3Sub')
 
+const walnut = require('./walnut')
+
 /*
  * Return a new 3D geometry representing space in this geometry but not in the given geometries.
  * Neither this geometry nor the given geometries are modified.
@@ -12,6 +14,9 @@ const subtractSub = require('./subtractGeom3Sub')
  */
 const subtract = (...geometries) => {
   geometries = flatten(geometries)
+  if (walnut.walnut !== null) {
+    return walnut.subtract.apply(walnut, geometries)
+  }
 
   let newgeometry = geometries.shift()
   geometries.forEach((geometry) => {

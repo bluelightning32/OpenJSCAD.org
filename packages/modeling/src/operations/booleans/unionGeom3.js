@@ -4,6 +4,8 @@ const retessellate = require('../modifiers/retessellate')
 
 const unionSub = require('./unionGeom3Sub')
 
+const walnut = require('./walnut')
+
 /*
  * Return a new 3D geometry representing the space in the given 3D geometries.
  * @param {...objects} geometries - list of geometries to union
@@ -11,6 +13,9 @@ const unionSub = require('./unionGeom3Sub')
  */
 const union = (...geometries) => {
   geometries = flatten(geometries)
+  if (walnut.walnut !== null) {
+    return walnut.union.apply(walnut, geometries)
+  }
 
   // combine geometries in a way that forms a balanced binary tree pattern
   let i

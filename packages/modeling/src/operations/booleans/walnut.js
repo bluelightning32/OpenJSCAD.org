@@ -27,7 +27,6 @@ function init(wasmPath, callback) {
   })
 }
 
-
 function w_AllocateFloatVertexArray(vertexCount){
   let vertexPointer = module.exports.walnut._AllocateFloatVertexArray(/*max_vertices=*/vertexCount)
   let vertices = module.exports.walnut.HEAPF32.subarray(vertexPointer/4, vertexPointer/4 + vertexCount*3)
@@ -88,7 +87,7 @@ function toWalnutTransformed(obj){
   module.exports.walnut._FreeTempVertexBuffer(tmpBuffer)
   polyBuffer.free()
 
-  mesh.vertexCount = vertexCount	
+  mesh.vertexCount = vertexCount
   return mesh
 }
 
@@ -146,7 +145,7 @@ const resizeDoubleVertexArray = (buffer, size) => {
   return module.exports.walnut.HEAPF64.subarray(pointer/8, pointer/8 + size*3)
 }
 
-const addToTreeTransformed = (id, geom, doubleVertexBuffer, ratioVertexBuffer, tree) => {
+const addToTreeTransformed = (id, geom, doubleVertexBuffer, flip, ratioVertexBuffer, tree) => {
   let { transforms } = geom
 
   let v = [0, 0, 0]
@@ -161,18 +160,17 @@ const addToTreeTransformed = (id, geom, doubleVertexBuffer, ratioVertexBuffer, t
       count += 3
     })
     tree = module.exports.walnut._AddDoublePolygonToTree(id, count/3,
-      doubleVertexBuffer.byteOffset, PRECISION, ratioVertexBuffer, tree)
+      doubleVertexBuffer.byteOffset, PRECISION, flip, ratioVertexBuffer, tree)
   })
 
   return [doubleVertexBuffer, tree]
 }
 
-const addToTree = (id, geom, doubleVertexBuffer, ratioVertexBuffer, tree) => {
+const addToTree = (id, geom, doubleVertexBuffer, flip, ratioVertexBuffer, tree) => {
   if (geom.transforms && !mat4.isIdentity(geom.transforms)) {
-    return addToTreeTransformed(id, geom, doubleVertexBuffer, ratioVertexBuffer, tree)
+    return addToTreeTransformed(id, geom, doubleVertexBuffer, flip, ratioVertexBuffer, tree)
   }
 
-  console.log(geom)
   geom.polygons.forEach(polygon=>{
     if (polygon.vertices.length > doubleVertexBuffer.length) {
       doubleVertexBuffer = resizeDoubleVertexArray(
@@ -184,33 +182,83 @@ const addToTree = (id, geom, doubleVertexBuffer, ratioVertexBuffer, tree) => {
       count += 3
     })
     tree = module.exports.walnut._AddDoublePolygonToTree(id, polygon.vertices.length,
-      doubleVertexBuffer.byteOffset, PRECISION, ratioVertexBuffer, tree)
+      doubleVertexBuffer.byteOffset, PRECISION, flip, ratioVertexBuffer, tree)
   })
 
   return [doubleVertexBuffer, tree]
+}
+
+const allocateIdArray = (length) => {
+  const pointer = module.exports.walnut._AllocateIdArray(length)
+  return module.exports.walnut.HEAPU32.subarray(pointer/4, pointer/4 + length)
 }
 
 const intersect = (...geometries) => {
   let tree = 0
 
   const ratioVertexBuffer = module.exports.walnut._AllocateTempVertexBuffer()
-
-  const idsPointer = module.exports.walnut._AllocateIdArray(geometries.length)
-  const ids = module.exports.walnut.HEAPU32.subarray(idsPointer/4, idsPointer/4 + geometries.length)
-
-  doubleVertexBuffer = allocateDoubleVertexArray(4096)
+  const ids = allocateIdArray(geometries.length)
+  let doubleVertexBuffer = allocateDoubleVertexArray(4096)
 
   for (let i = 0; i < geometries.length; ++i) {
     ids[i] = i;
-    [doubleVertexBuffer, tree] = addToTree(i, geometries[i], doubleVertexBuffer, ratioVertexBuffer, tree)
+    [doubleVertexBuffer, tree] = addToTree(i, geometries[i], doubleVertexBuffer, false, ratioVertexBuffer, tree)
   }
 
-  const mesh = module.exports.walnut._IntersectInTree(tree, idsPointer, geometries.length, 0)
+  const mesh = module.exports.walnut._IntersectInTree(tree, ids.byteOffset, geometries.length, 0)
   const result = doublePolygonArrayToGeom(mesh)
 
   module.exports.walnut._FreeDoublePolygonArray(mesh)
   module.exports.walnut._FreeTree(tree)
-  module.exports.walnut._FreeIdArray(idsPointer)
+  module.exports.walnut._FreeIdArray(ids.byteOffset)
+  module.exports.walnut._FreeTempVertexBuffer(ratioVertexBuffer)
+  module.exports.walnut._FreeDoubleVertexArray(doubleVertexBuffer.byteOffset)
+
+  return result
+}
+
+const union = (...geometries) => {
+  let tree = 0
+
+  const ratioVertexBuffer = module.exports.walnut._AllocateTempVertexBuffer()
+  const ids = allocateIdArray(geometries.length)
+  let doubleVertexBuffer = allocateDoubleVertexArray(4096)
+
+  for (let i = 0; i < geometries.length; ++i) {
+    ids[i] = i;
+    [doubleVertexBuffer, tree] = addToTree(i, geometries[i], doubleVertexBuffer, false, ratioVertexBuffer, tree)
+  }
+
+  const mesh = module.exports.walnut._UnionInTree(tree, ids.byteOffset, geometries.length, 0)
+  const result = doublePolygonArrayToGeom(mesh)
+
+  module.exports.walnut._FreeDoublePolygonArray(mesh)
+  module.exports.walnut._FreeTree(tree)
+  module.exports.walnut._FreeIdArray(ids.byteOffset)
+  module.exports.walnut._FreeTempVertexBuffer(ratioVertexBuffer)
+  module.exports.walnut._FreeDoubleVertexArray(doubleVertexBuffer.byteOffset)
+
+  return result
+}
+
+const subtract = (...geometries) => {
+  let tree = 0
+
+  const ratioVertexBuffer = module.exports.walnut._AllocateTempVertexBuffer()
+  const ids = allocateIdArray(geometries.length)
+  let doubleVertexBuffer = allocateDoubleVertexArray(4096)
+
+  for (let i = 0; i < geometries.length; ++i) {
+    ids[i] = i;
+    [doubleVertexBuffer, tree] = addToTree(i, geometries[i], doubleVertexBuffer, i != 0, ratioVertexBuffer, tree)
+  }
+
+  const mesh = module.exports.walnut._SubtractInTree(tree, ids.byteOffset, geometries.length, 0)
+  const result = doublePolygonArrayToGeom(mesh)
+
+  module.exports.walnut._FreeDoublePolygonArray(mesh)
+  module.exports.walnut._FreeTree(tree)
+  module.exports.walnut._FreeIdArray(ids.byteOffset)
   module.exports.walnut._FreeTempVertexBuffer(ratioVertexBuffer)
   module.exports.walnut._FreeDoubleVertexArray(doubleVertexBuffer.byteOffset)
 
@@ -219,6 +267,8 @@ const intersect = (...geometries) => {
 
 module.exports = {
   init: init,
-  walnut: null,
-  intersect: intersect
+  intersect: intersect,
+  subtract: subtract,
+  union: union,
+  walnut: null
 }
